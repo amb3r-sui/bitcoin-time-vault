@@ -1,6 +1,59 @@
-# Bitcoin Time Vault v1 (OP_NET Testnet)
+# Bitcoin Time Vault v1 (OP_NET)
 
-Production-ready frontend dApp for OP_NET TESTNET using **PILL OP_20**.
+Production frontend dApp for OP_NET Testnet using the PILL OP_20 token.
+
+## What It Does
+
+- Runs a 60-second last-depositor game ("Time Vault")
+- Uses real OP_NET Testnet RPC calls (no mock chain data)
+- Uses push deposit model:
+  - Step 1: user sends PILL to vault address
+  - Step 2: user records deposit on vault contract
+- Lets only the current leader claim the full pot after expiry
+- Shows live countdown, pot, leader, and event feed
+
+## Architecture (Transparency)
+
+### Frontend
+
+- `app/page.tsx`: page state, polling, actions flow
+- `components/HeaderBar.tsx`: top network, token, wallet, and address info
+- `components/VaultStatusCard.tsx`: pot, leader, round, countdown
+- `components/ActionsCard.tsx`: connect, deposit stepper, claim
+- `components/EventFeed.tsx`: recent events with tx hash copy/link
+- `components/RpcDebugPanel.tsx`: resolver/method debug logs
+
+### Chain integration
+
+- `lib/opnetRpc.ts`:
+  - JSON-RPC client with method resolver
+  - auto-detects working RPC method names from candidate lists
+  - caches resolved methods in `localStorage`
+- `lib/vaultClient.ts`:
+  - reads vault state and events
+  - normalizes variant event/state shapes
+  - supports both `recordDeposit(txid)` and `recordDeposit(amount,depositor,txid)`
+- `lib/walletDetect.ts`:
+  - auto-detects wallet providers (`opwallet`, `opnet`, `bitcoin`, `unisat`, `ethereum`)
+  - probes capabilities and enables Manual Mode fallback
+
+## Current Status
+
+- Next.js 14 + TypeScript app router frontend implemented
+- Tailwind + shadcn/ui components wired
+- TanStack Query polling implemented
+- zod validation for deposit input and txid
+- Real RPC integration with method auto-detection and fallback
+- Wallet capability probing with Manual Mode flow
+
+## Repository Structure
+
+- `/app` - app router pages and providers
+- `/components` - UI and feature components
+- `/lib` - config, formatting, validation, RPC, wallet, vault clients
+- `/types` - global window provider typings
+- `/README.md` - project docs
+- `/LICENSE` - MIT license
 
 ## Required Environment Variables
 
@@ -14,69 +67,69 @@ NEXT_PUBLIC_EXPLORER_ADDR=https://your-explorer/address
 ```
 
 Required:
+
 - `NEXT_PUBLIC_OPNET_RPC_URL`
 - `NEXT_PUBLIC_VAULT_ADDRESS`
 
 Optional:
+
 - `NEXT_PUBLIC_EXPLORER_TX`
 - `NEXT_PUBLIC_EXPLORER_ADDR`
 
-## Run Locally
+## How To Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open: `http://localhost:3000`
+Open `http://localhost:3000`.
 
-## Deploy to Vercel
+## Deploy To Vercel
 
 1. Push this repo to GitHub.
-2. Import project in Vercel.
-3. Set env vars in Vercel Project Settings:
-   - `NEXT_PUBLIC_OPNET_RPC_URL`
-   - `NEXT_PUBLIC_VAULT_ADDRESS`
-   - optional explorer vars
+2. Import the repository in Vercel.
+3. Add environment variables in Vercel Project Settings.
 4. Deploy.
 
 ## Manual Mode (OP_WALLET fallback)
 
-If wallet/provider lacks required capabilities:
+If wallet/provider cannot sign one or more calls:
 
-1. Use OP_WALLET UI to send PILL OP_20 manually:
+1. Send PILL manually in OP_WALLET:
    - Token ID: `opt1sqp5gx9k0nrqph3sy3aeyzt673dz7ygtqxcfdqfle`
    - To: vault address
    - Amount: chosen PILL amount
 2. Copy the transfer txid.
-3. Paste txid into Step 2 in app.
-4. Use manual call instructions shown in-app for `recordDeposit(...)` and `claim()` when in-app signing is unavailable.
-5. Click refresh / keep auto-refresh enabled until state/events update.
+3. Paste txid into Step 2 in the app.
+4. Use in-app call instructions for `recordDeposit(...)` or `claim()` if needed.
+5. Refresh/poll until state and event feed update.
 
-## RPC Auto-Detect Strategy
+## RPC Auto-Detect Details
 
-`lib/opnetRpc.ts` contains a method resolver with candidate lists per action:
+The method resolver in `lib/opnetRpc.ts` tries candidates until one succeeds:
 
 - `getContractStateCandidates`
 - `getContractEventsCandidates`
 - `getTxCandidates`
 - `sendTxCandidates`
 
-On first use:
-- each candidate method is tried with test params
-- first successful non-error JSON-RPC method is selected
-- selected method is cached in `localStorage` (`btv1.rpc.resolved.*`)
+After first success, method names are cached in localStorage:
 
-If cached method later fails, resolver auto-falls back and re-resolves.
+- `btv1.rpc.resolved.getContractState`
+- `btv1.rpc.resolved.getContractEvents`
+- `btv1.rpc.resolved.getTx`
+- `btv1.rpc.resolved.sendTx`
+
+If a cached method fails later, the resolver retries candidate discovery.
 
 ## 60-Second Demo Script
 
 1. Connect wallet (or stay in Manual Mode).
 2. Enter `10` PILL.
-3. Step 1: send PILL to vault (in-app or manual).
+3. Step 1: send PILL to vault.
 4. Step 2: record deposit on contract.
-5. Watch countdown at `60s`.
+5. Show countdown reset to 60 seconds.
 6. Make another deposit before expiry to reset timer.
-7. Let timer reach `Expired - leader can claim`.
-8. Current leader clicks Claim (or uses manual claim call instructions).
-
+7. Wait for `Expired - leader can claim`.
+8. Leader claims the full pot.
