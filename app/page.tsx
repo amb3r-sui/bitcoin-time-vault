@@ -35,7 +35,7 @@ function isLikelyTestnet(network: string) {
 export default function HomePage() {
   const config = loadPublicConfig();
 
-  const [wallet, setWallet] = useState<WalletAdapter>(() => detectWallet());
+  const [wallet, setWallet] = useState<WalletAdapter | null>(null);
   const [connectedAddress, setConnectedAddress] = useState<string>("");
   const [connectedNetwork, setConnectedNetwork] = useState<string>("");
   const [nowSec, setNowSec] = useState(Math.floor(Date.now() / 1000));
@@ -61,6 +61,19 @@ export default function HomePage() {
   useEffect(() => {
     setWallet(detectWallet());
   }, []);
+
+  const walletDetection =
+    wallet?.detection ??
+    ({
+      providerName: "No provider detected",
+      mode: "manual",
+      reason: "Detecting wallet provider...",
+      capabilities: {
+        canConnect: false,
+        canSendOp20: false,
+        canSignAndSendContractCall: false
+      }
+    } as const);
 
   const rpcClient = useMemo(() => {
     if (!config.ok) return null;
@@ -103,14 +116,24 @@ export default function HomePage() {
   });
 
   const fullWalletCapabilities =
-    wallet.detection.capabilities.canConnect &&
-    wallet.detection.capabilities.canSendOp20 &&
-    wallet.detection.capabilities.canSignAndSendContractCall;
-  const connectionMode = fullWalletCapabilities ? "wallet" : "manual";
+    walletDetection.capabilities.canConnect &&
+    walletDetection.capabilities.canSendOp20 &&
+    walletDetection.capabilities.canSignAndSendContractCall;
+  const connectionMode = walletDetection.mode === "wallet" && fullWalletCapabilities ? "wallet" : "manual";
+  const connectionState = connectedAddress ? "connected" : connectionMode === "wallet" ? "ready" : "manual";
 
   async function handleConnect() {
-    if (!wallet.detection.capabilities.canConnect) {
-      toast.error("This provider cannot connect accounts. Manual Mode remains enabled.");
+    if (!wallet) {
+      toast.error("Wallet provider is still being detected. Retry in a moment.");
+      return;
+    }
+    if (walletDetection.mode !== "wallet") {
+      toast.error(walletDetection.reason ?? "Automatic mode requires OP_WALLET / OP_NET provider.");
+      return;
+    }
+
+    if (!walletDetection.capabilities.canConnect) {
+      toast.error("This provider cannot connect accounts for automatic mode.");
       return;
     }
 
@@ -140,13 +163,17 @@ export default function HomePage() {
       return;
     }
 
-    if (connectionMode === "manual") {
-      toast.message("Manual Mode: send PILL in OP_WALLET UI, then paste txid below.");
+    if (connectionMode !== "wallet") {
+      toast.error("Automatic mode is required. Enable OP_WALLET with full capabilities.");
       return;
     }
 
     if (!connectedAddress) {
       toast.error("Connect wallet first.");
+      return;
+    }
+    if (!wallet) {
+      toast.error("Wallet provider unavailable. Refresh and reconnect.");
       return;
     }
 
@@ -187,9 +214,17 @@ export default function HomePage() {
       return;
     }
 
-    if (!wallet.detection.capabilities.canSignAndSendContractCall) {
-      toast.message("Manual call required: use call instructions then refresh state/events.");
-      await Promise.all([stateQuery.refetch(), eventsQuery.refetch()]);
+    if (connectionMode !== "wallet") {
+      toast.error("Automatic mode is required. Enable OP_WALLET with full capabilities.");
+      return;
+    }
+
+    if (!walletDetection.capabilities.canSignAndSendContractCall) {
+      toast.error("Wallet cannot call contract in-app.");
+      return;
+    }
+    if (!wallet) {
+      toast.error("Wallet provider unavailable. Refresh and reconnect.");
       return;
     }
 
@@ -219,8 +254,17 @@ export default function HomePage() {
       return;
     }
 
-    if (!wallet.detection.capabilities.canSignAndSendContractCall) {
-      toast.message("Manual claim call required. Use claim() call instructions.");
+    if (connectionMode !== "wallet") {
+      toast.error("Automatic mode is required. Enable OP_WALLET with full capabilities.");
+      return;
+    }
+
+    if (!walletDetection.capabilities.canSignAndSendContractCall) {
+      toast.error("Wallet cannot call contract in-app.");
+      return;
+    }
+    if (!wallet) {
+      toast.error("Wallet provider unavailable. Refresh and reconnect.");
       return;
     }
 
@@ -268,14 +312,15 @@ export default function HomePage() {
         vaultAddress={config.data.NEXT_PUBLIC_VAULT_ADDRESS}
         tokenId={PILL_TOKEN_ID}
         walletAddress={connectedAddress}
-        connectionMode={connectionMode}
+        connectionState={connectionState}
       />
 
-      {wallet.detection.mode === "manual" ? (
-        <Alert>
-          <AlertTitle>Manual Mode Enabled</AlertTitle>
+      {connectionMode !== "wallet" ? (
+        <Alert variant="destructive">
+          <AlertTitle>Automatic Wallet Mode Required</AlertTitle>
           <AlertDescription>
-            {wallet.detection.reason ?? "Wallet capabilities are limited. You can still use real-chain manual flow."}
+            {walletDetection.reason ??
+              "Enable OP_WALLET / OP_NET provider with connect + OP_20 send + contract-call support."}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -323,7 +368,7 @@ export default function HomePage() {
             state={state}
             connectedAddress={connectedAddress}
             walletMode={connectionMode}
-            capabilities={wallet.detection.capabilities}
+            capabilities={walletDetection.capabilities}
             amountInput={amountInput}
             setAmountInput={setAmountInput}
             transferTxidInput={transferTxidInput}

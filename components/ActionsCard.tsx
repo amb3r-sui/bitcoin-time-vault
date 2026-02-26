@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 
-import { CallInstructions } from "@/components/CallInstructions";
 import { CopyButton } from "@/components/CopyButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,20 +78,18 @@ export function ActionsCard(props: ActionsCardProps) {
 
   const step1Reason = !parsedAmount
     ? "Amount must be a whole number > 0"
-    : walletMode === "manual"
-      ? "Manual Mode: send PILL in OP_WALLET UI and paste txid."
-      : !connectedAddress
-        ? "Connect wallet first."
-        : !capabilities.canSendOp20
-          ? "Wallet cannot send OP_20 in-app; use Manual Mode."
-          : "";
+    : !connectedAddress
+      ? "Connect wallet first."
+      : !capabilities.canSendOp20
+        ? "Wallet does not support OP_20 transfer in-app."
+        : "";
 
   const step2Reason = !transferTxidInput.trim()
     ? "Paste transfer txid first."
-    : !connectedAddress && walletMode === "wallet"
+    : !connectedAddress
       ? "Connect wallet first."
       : !capabilities.canSignAndSendContractCall
-        ? "Wallet cannot call contract in-app; use call instructions."
+        ? "Wallet does not support in-app contract calls."
         : "";
 
   const claimReason = !connectedAddress
@@ -102,7 +99,7 @@ export function ActionsCard(props: ActionsCardProps) {
       : !isLeader
         ? "Only leader can claim."
         : !capabilities.canSignAndSendContractCall
-          ? "Wallet cannot call contract in-app; use call instructions."
+          ? "Wallet does not support in-app contract calls."
           : "";
 
   return (
@@ -116,8 +113,8 @@ export function ActionsCard(props: ActionsCardProps) {
             {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {connectedAddress ? "Reconnect Wallet" : "Connect Wallet"}
           </Button>
-          <Badge variant={walletMode === "wallet" ? "default" : "secondary"}>
-            {walletMode === "wallet" ? "Wallet Mode" : "Manual Mode"}
+          <Badge variant={walletMode === "wallet" ? "default" : "destructive"}>
+            {walletMode === "wallet" ? "Wallet Mode" : "Wallet Required"}
           </Badge>
         </div>
 
@@ -151,25 +148,21 @@ export function ActionsCard(props: ActionsCardProps) {
             <Badge variant="outline">Step 1</Badge>
             <span>Send PILL to vault</span>
           </div>
+          <div className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs">
+            <span className="text-muted-foreground">To:</span>
+            <span className="font-mono">{vaultAddress}</span>
+            <CopyButton value={vaultAddress} ariaLabel="Copy vault address" />
+          </div>
 
           <Button
             onClick={onStep1Send}
             disabled={!!step1Reason || isSending}
             className="w-full justify-between"
           >
-            <span>{walletMode === "wallet" ? "Send PILL In-App" : "I Sent PILL In OP_WALLET"}</span>
+            <span>Send PILL In-App</span>
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
           </Button>
           {step1Reason ? <p className="text-xs text-muted-foreground">{step1Reason}</p> : null}
-
-          {walletMode === "manual" ? (
-            <div className="space-y-2 rounded-md border border-dashed p-3 text-xs">
-              <p className="font-semibold">Manual Send Instructions</p>
-              <p>To: <span className="font-mono">{vaultAddress}</span> <CopyButton value={vaultAddress} /></p>
-              <p>Token ID: <span className="font-mono">{tokenId}</span> <CopyButton value={tokenId} /></p>
-              <p>Amount: <span className="font-mono">{amountInput || "0"} PILL</span></p>
-            </div>
-          ) : null}
 
           {lastStep1TxHash ? (
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
@@ -200,14 +193,6 @@ export function ActionsCard(props: ActionsCardProps) {
           </Button>
           {step2Reason ? <p className="text-xs text-muted-foreground">{step2Reason}</p> : null}
 
-          {!capabilities.canSignAndSendContractCall ? (
-            <CallInstructions
-              title="Manual recordDeposit call"
-              method="recordDeposit"
-              args={[transferTxidInput || "<txid>"]}
-            />
-          ) : null}
-
           {lastStep2TxHash ? (
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
               Last recordDeposit tx: <span className="font-mono">{lastStep2TxHash}</span>
@@ -225,9 +210,6 @@ export function ActionsCard(props: ActionsCardProps) {
             Claim Pot
           </Button>
           {claimReason ? <p className="text-xs text-muted-foreground">{claimReason}</p> : null}
-          {!capabilities.canSignAndSendContractCall ? (
-            <CallInstructions title="Manual claim call" method="claim" args={[]} />
-          ) : null}
           {lastClaimTxHash ? (
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
               Last claim tx: <span className="font-mono">{lastClaimTxHash}</span>
@@ -241,4 +223,3 @@ export function ActionsCard(props: ActionsCardProps) {
     </Card>
   );
 }
-

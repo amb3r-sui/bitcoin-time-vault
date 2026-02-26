@@ -9,10 +9,19 @@ interface HeaderBarProps {
   vaultAddress: string;
   tokenId: string;
   walletAddress?: string;
-  connectionMode: "wallet" | "manual";
+  connectionState: "connected" | "ready" | "manual";
 }
 
-export function HeaderBar({ vaultAddress, tokenId, walletAddress, connectionMode }: HeaderBarProps) {
+export function HeaderBar({ vaultAddress, tokenId, walletAddress, connectionState }: HeaderBarProps) {
+  const badgeVariant =
+    connectionState === "connected" ? "default" : connectionState === "ready" ? "outline" : "secondary";
+  const badgeText =
+    connectionState === "connected"
+      ? "Wallet Connected"
+      : connectionState === "ready"
+        ? "Wallet Ready"
+        : "Wallet Required";
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -23,9 +32,7 @@ export function HeaderBar({ vaultAddress, tokenId, walletAddress, connectionMode
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">OP_NET Testnet</Badge>
           <Badge variant="outline">PILL OP_20</Badge>
-          <Badge variant={connectionMode === "wallet" ? "default" : "secondary"}>
-            {connectionMode === "wallet" ? "Wallet Connected" : "Manual Mode"}
-          </Badge>
+          <Badge variant={badgeVariant}>{badgeText}</Badge>
         </div>
       </div>
 
@@ -66,4 +73,3 @@ export function HeaderBar({ vaultAddress, tokenId, walletAddress, connectionMode
     </div>
   );
 }
-
