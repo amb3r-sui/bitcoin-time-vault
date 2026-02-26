@@ -69,6 +69,14 @@ interface OpnetRpcClientOptions {
   onDebug?: (entry: RpcDebugEntry) => void;
 }
 
+function normalizeOpnetRpcUrl(url: string) {
+  const trimmed = url.trim().replace(/\/+$/, "");
+  if (trimmed.includes("/api/v1/json-rpc")) {
+    return trimmed;
+  }
+  return `${trimmed}/api/v1/json-rpc`;
+}
+
 export class OpnetRpcClient {
   private readonly rpcUrl: string;
   private readonly onDebug?: (entry: RpcDebugEntry) => void;
@@ -77,7 +85,7 @@ export class OpnetRpcClient {
   private resolvedMethodMemory = new Map<string, string>();
 
   constructor(options: OpnetRpcClientOptions) {
-    this.rpcUrl = options.rpcUrl;
+    this.rpcUrl = normalizeOpnetRpcUrl(options.rpcUrl);
     this.onDebug = options.onDebug;
   }
 
@@ -274,4 +282,3 @@ export class OpnetRpcClient {
     return result;
   }
 }
-
